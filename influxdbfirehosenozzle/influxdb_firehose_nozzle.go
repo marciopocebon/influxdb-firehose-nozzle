@@ -58,13 +58,14 @@ func (d *InfluxDbFirehoseNozzle) createClient() {
 	}
 
 	d.client = influxdbclient.New(d.config.InfluxDbUrl, d.config.InfluxDbDatabase, d.config.InfluxDbUser,
-		d.config.InfluxDbPassword, d.config.MetricPrefix, d.config.Deployment, ipAddress)
+		d.config.InfluxDbPassword, d.config.InfluxDbSslSkipVerify,
+		d.config.MetricPrefix, d.config.Deployment, ipAddress)
 }
 
 func (d *InfluxDbFirehoseNozzle) consumeFirehose(authToken string) {
 	d.consumer = noaa.NewConsumer(
 		d.config.TrafficControllerURL,
-		&tls.Config{InsecureSkipVerify: d.config.InsecureSSLSkipVerify},
+		&tls.Config{InsecureSkipVerify: d.config.SsLSkipVerify},
 		nil)
 	d.consumer.SetIdleTimeout(time.Duration(d.config.IdleTimeoutSeconds) * time.Second)
 	go d.consumer.Firehose(d.config.FirehoseSubscriptionID, authToken, d.messages, d.errs)

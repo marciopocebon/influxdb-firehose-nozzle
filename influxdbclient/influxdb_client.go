@@ -2,6 +2,7 @@ package influxdbclient
 
 import (
 	"bytes"
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -18,6 +19,7 @@ type Client struct {
 	database              string
 	user                  string
 	password              string
+	allowSelfSigned       bool
 	metricPoints          map[metricKey]metricValue
 	prefix                string
 	deployment            string
@@ -53,16 +55,17 @@ type Point struct {
 	Value     float64
 }
 
-func New(url string, database string, user string, password string, prefix string, deployment string, ip string) *Client {
+func New(url string, database string, user string, password string, allowSelfSigned bool, prefix string, deployment string, ip string) *Client {
 	return &Client{
-		url:          url,
-		database:     database,
-		user:         user,
-		password:     password,
-		metricPoints: make(map[metricKey]metricValue),
-		prefix:       prefix,
-		deployment:   deployment,
-		ip:           ip,
+		url:             url,
+		database:        database,
+		user:            user,
+		password:        password,
+		allowSelfSigned: allowSelfSigned,
+		metricPoints:    make(map[metricKey]metricValue),
+		prefix:          prefix,
+		deployment:      deployment,
+		ip:              ip,
 	}
 }
 
@@ -106,8 +109,12 @@ func (c *Client) PostMetrics() error {
 
 	seriesBytes, metricsCount := c.formatMetrics()
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(seriesBytes))
-	resp, err := http.DefaultClient.Do(req)
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	httpClient := &http.Client{Transport: tr}
+
+	resp, err := httpClient.Post(url, "application/binary", bytes.NewBuffer(seriesBytes))
 	if err != nil {
 		return err
 	}

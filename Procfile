@@ -1,1 +1,1 @@
-web: inflxudb-firehose-nozzle
+web: influxdb-firehose-nozzle

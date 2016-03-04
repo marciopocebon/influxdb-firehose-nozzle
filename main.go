@@ -29,7 +29,7 @@ func main() {
 		UaaUrl:                config.UAAURL,
 		Username:              config.Username,
 		Password:              config.Password,
-		InsecureSSLSkipVerify: config.InsecureSSLSkipVerify,
+		InsecureSSLSkipVerify: config.SsLSkipVerify,
 	}
 
 	threadDumpChan := registerGoRoutineDumpSignalChannel()
