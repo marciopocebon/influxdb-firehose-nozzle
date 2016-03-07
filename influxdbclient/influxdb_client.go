@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	"errors"
 	"log"
 
 	"github.com/cloudfoundry/sonde-go/events"
@@ -265,26 +264,4 @@ func appendTagIfNotEmpty(tags []string, key string, value string) []string {
 		tags = append(tags, fmt.Sprintf("%s=%s", key, value))
 	}
 	return tags
-}
-
-func (p Point) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf(`[%d, %f]`, p.Timestamp, p.Value)), nil
-}
-
-func (p *Point) UnmarshalJSON(in []byte) error {
-	var timestamp int64
-	var value float64
-
-	parsed, err := fmt.Sscanf(string(in), `[%d,%f]`, &timestamp, &value)
-	if err != nil {
-		return err
-	}
-	if parsed != 2 {
-		return errors.New("expected two parsed values")
-	}
-
-	p.Timestamp = timestamp
-	p.Value = value
-
-	return nil
 }
