@@ -197,9 +197,9 @@ func formatValues(points []Point) string {
 
 func formatTimestamp(points []Point) string {
 	if len(points) > 0 {
-		return strconv.FormatInt(points[0].Timestamp*1000*1000*1000, 10)
+		return strconv.FormatInt(points[0].Timestamp, 10)
 	} else {
-		return strconv.FormatInt(time.Now().Unix()*1000*1000*1000, 10)
+		return strconv.FormatInt(time.Now().Unix(), 10)
 	}
 }
 
