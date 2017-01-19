@@ -97,8 +97,8 @@ parameters are supported
 | Environment variable          | Description            |
 |-------------------------------|------------------------|
 | NOZZLE_UAAURL                 | UAA URL which the nozzle uses to get an authentication token for the firehose |
-| NOZZLE_USERNAME               | User who has access to the firehose |
-| NOZZLE_PASSWORD               | Password for the user |
+| NOZZLE_CLIENT                 | Client who has access to the firehose |
+| NOZZLE_CLIENT_SECRET          | Secret for the client |
 | NOZZLE_TRAFFICCONTROLLERURL   | Loggregator's traffic controller URL |
 | NOZZLE_FIREHOSESUBSCRIPTIONID | Subscription ID used when connecting to the firehose. Nozzles with the same subscription ID get a proportional share of the firehose |
 | NOZZLE_INFLUXDB_URL           | The influxdb API URL |
@@ -107,6 +107,7 @@ parameters are supported
 | NOZZLE_INFLUXDB_PASSWORD      | The password name used when publishing metrics to influxdb |
 | NOZZLE_METRICPREFIX           | The metric prefix is prepended to all metrics flowing through the nozzle |
 | NOZZLE_DEPLOYMENT             | The deployment name for the nozzle. Used for tagging metrics internal to the nozzle |
+| NOZZLE_DEPLOYMENT_FILTER      | If set, the nozzle will only send metrics with this deployment name |
 | NOZZLE_FLUSHDURATIONSECONDS   | Number of seconds to buffer data before publishing to influxdb |
 | NOZZLE_INSECURESSLSKIPVERIFY  | If true, allows insecure connections to the UAA and the Trafficcontroller |
 | NOZZLE_DISABLEACCESSCONTROL   | If true, disables authentication with the UAA. Used in lattice deployments |

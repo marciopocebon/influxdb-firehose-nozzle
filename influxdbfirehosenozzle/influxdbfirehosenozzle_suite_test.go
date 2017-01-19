@@ -4,8 +4,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"io/ioutil"
-	"log"
 	"testing"
 )
 
@@ -14,6 +12,3 @@ func TestDatadogfirehosenozzle(t *testing.T) {
 	RunSpecs(t, "DatadogFirehoseNozzle Suite")
 }
 
-var _ = BeforeSuite(func() {
-	log.SetOutput(ioutil.Discard)
-})

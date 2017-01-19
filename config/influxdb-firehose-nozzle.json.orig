@@ -1,0 +1,19 @@
+{
+  "UAAURL": "https://uaa.onevoila.rocks",
+  "Client": "influxdb-firehose-nozzle",
+  "ClientSecret": "c1oudc0w",
+  "TrafficControllerURL": "wss://doppler.onevoila.rocks:4443",
+  "FirehoseSubscriptionID": "influxdb-firehose-nozzle",
+  "InfluxDbUrl": "https://88.198.249.61:8086",
+  "InfluxDbDatabase": "cloudfoundry",
+  "InfluxDbUser": "cf",
+  "InfluxDbPassword": "cf",
+  "InfluxDbAllowSelfSigned": true,
+  "FlushDurationSeconds": 15,
+  "SsLSkipVerify": true,
+  "MetricPrefix": "cf",
+  "Deployment": "cf-ops",
+  "DeploymentFilter": "deployment-filter",
+  "DisableAccessControl": false,
+  "IdleTimeoutSeconds" : 60
+}

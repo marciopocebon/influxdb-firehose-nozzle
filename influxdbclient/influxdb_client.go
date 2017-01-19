@@ -3,13 +3,14 @@ package influxdbclient
 import (
 	"bytes"
 	"crypto/tls"
+        "crypto/sha1"
 	"fmt"
 	"net/http"
 	"strconv"
 	"time"
+	"sort"
 
-	"log"
-
+        "github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/sonde-go/events"
 )
 
@@ -23,17 +24,16 @@ type Client struct {
 	prefix                string
 	deployment            string
 	ip                    string
+        tagsHash	      string
 	totalMessagesReceived uint64
 	totalMetricsSent      uint64
+        log                   *gosteno.Logger
 }
 
 type metricKey struct {
 	eventType  events.Envelope_EventType
 	name       string
-	deployment string
-	job        string
-	index      string
-	ip         string
+        tagsHash   string
 }
 
 type metricValue struct {
@@ -54,7 +54,11 @@ type Point struct {
 	Value     float64
 }
 
-func New(url string, database string, user string, password string, allowSelfSigned bool, prefix string, deployment string, ip string) *Client {
+func New(url string, database string, user string, password string, allowSelfSigned bool, prefix string, deployment string, ip string, log *gosteno.Logger) *Client {
+        ourTags := []string{
+		"deployment:" + deployment,
+		"ip:" + ip,
+	}
 	return &Client{
 		url:             url,
 		database:        database,
@@ -65,6 +69,8 @@ func New(url string, database string, user string, password string, allowSelfSig
 		prefix:          prefix,
 		deployment:      deployment,
 		ip:              ip,
+		log:		 log,
+		tagsHash:	 hashTags(ourTags),
 	}
 }
 
@@ -77,20 +83,18 @@ func (c *Client) AddMetric(envelope *events.Envelope) {
 	if envelope.GetEventType() != events.Envelope_ValueMetric && envelope.GetEventType() != events.Envelope_CounterEvent {
 		return
 	}
-
+	
+	tags := parseTags(envelope)
 	key := metricKey{
 		eventType:  envelope.GetEventType(),
 		name:       getName(envelope),
-		deployment: envelope.GetDeployment(),
-		job:        envelope.GetJob(),
-		index:      envelope.GetIndex(),
-		ip:         envelope.GetIp(),
+		tagsHash:   hashTags(tags),
 	}
 
 	mVal := c.metricPoints[key]
 	value := getValue(envelope)
 
-	mVal.tags = getTags(envelope)
+	mVal.tags = tags 
 	mVal.points = append(mVal.points, Point{
 		Timestamp: envelope.GetTimestamp() / int64(time.Second),
 		Value:     value,
@@ -104,7 +108,7 @@ func (c *Client) PostMetrics() error {
 
 	c.populateInternalMetrics()
 	numMetrics := len(c.metricPoints)
-	log.Printf("Posting %d metrics", numMetrics)
+	c.log.Infof("Posting %d metrics", numMetrics)
 
 	seriesBytes, metricsCount := c.formatMetrics()
 
@@ -131,7 +135,7 @@ func (c *Client) PostMetrics() error {
 
 func (c *Client) seriesURL() string {
 	url := fmt.Sprintf("%s/write?db=%s", c.url, c.database)
-	log.Print("Using the following influx URL " + url)
+	c.log.Infof("Using the following influx URL " + url)
 	return url
 }
 
@@ -147,8 +151,7 @@ func (c *Client) populateInternalMetrics() {
 func (c *Client) containsSlowConsumerAlert() bool {
 	key := metricKey{
 		name:       "slowConsumerAlert",
-		deployment: c.deployment,
-		ip:         c.ip,
+		tagsHash: c.tagsHash,
 	}
 	_, ok := c.metricPoints[key]
 	return ok
@@ -197,17 +200,16 @@ func formatValues(points []Point) string {
 
 func formatTimestamp(points []Point) string {
 	if len(points) > 0 {
-		return strconv.FormatInt(points[0].Timestamp*1000*1000*1000, 10)
+		return strconv.FormatInt(points[0].Timestamp, 10)
 	} else {
-		return strconv.FormatInt(time.Now().Unix()*1000*1000*1000, 10)
+		return strconv.FormatInt(time.Now().Unix(), 10)
 	}
 }
 
 func (c *Client) addInternalMetric(name string, value uint64) {
 	key := metricKey{
 		name:       name,
-		deployment: c.deployment,
-		ip:         c.ip,
+		tagsHash: c.tagsHash,
 	}
 
 	point := Point{
@@ -248,20 +250,32 @@ func getValue(envelope *events.Envelope) float64 {
 	}
 }
 
-func getTags(envelope *events.Envelope) []string {
-	var tags []string
+func parseTags(envelope *events.Envelope) []string {
+	tags := appendTagIfNotEmpty(nil, "deployment", envelope.GetDeployment())
 
-	tags = appendTagIfNotEmpty(tags, "deployment", envelope.GetDeployment())
 	tags = appendTagIfNotEmpty(tags, "job", envelope.GetJob())
 	tags = appendTagIfNotEmpty(tags, "index", envelope.GetIndex())
 	tags = appendTagIfNotEmpty(tags, "ip", envelope.GetIp())
+	for tname, tvalue := range envelope.GetTags() {
+ 		tags = appendTagIfNotEmpty(tags, tname, tvalue)
+ 	}
 
 	return tags
 }
 
-func appendTagIfNotEmpty(tags []string, key string, value string) []string {
+func appendTagIfNotEmpty(tags []string, key, value string) []string {
 	if value != "" {
 		tags = append(tags, fmt.Sprintf("%s=%s", key, value))
 	}
 	return tags
+}
+
+func hashTags(tags []string) string {
+ 	sort.Strings(tags)
+ 	hash := ""
+ 	for _, tag := range tags {
+ 		tagHash := sha1.Sum([]byte(tag))
+ 		hash += string(tagHash[:])
+ 	}
+ 	return hash
 }
