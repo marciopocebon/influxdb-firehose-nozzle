@@ -3,6 +3,7 @@ package influxdbfirehosenozzle
 import (
 	"crypto/tls"
 	"time"
+	"strings"
 
 	"github.com/cloudfoundry/noaa/consumer"
 	noaaerrors "github.com/cloudfoundry/noaa/errors"
@@ -12,6 +13,7 @@ import (
 	"github.com/evoila/influxdb-firehose-nozzle/nozzleconfig"
 	"github.com/gorilla/websocket"
 	"github.com/pivotal-golang/localip"
+	"github.com/evoila/influxdb-firehose-nozzle/cfinstanceinfoapi"
 )
 
 type InfluxDbFirehoseNozzle struct {
@@ -22,17 +24,19 @@ type InfluxDbFirehoseNozzle struct {
         consumer         *consumer.Consumer
 	client           *influxdbclient.Client
         log              *gosteno.Logger
+	appinfo          map[string]cfinstanceinfoapi.AppInfo
 }
 
 type AuthTokenFetcher interface {
 	FetchAuthToken() string
 }
 
-func NewInfluxDbFirehoseNozzle(config *nozzleconfig.NozzleConfig, tokenFetcher AuthTokenFetcher, log *gosteno.Logger) *InfluxDbFirehoseNozzle {
+func NewInfluxDbFirehoseNozzle(config *nozzleconfig.NozzleConfig, tokenFetcher AuthTokenFetcher, log *gosteno.Logger, appinfo map[string]cfinstanceinfoapi.AppInfo) *InfluxDbFirehoseNozzle {
 	return &InfluxDbFirehoseNozzle{
 		config:           config,
 		authTokenFetcher: tokenFetcher,
                 log:              log,
+		appinfo:          appinfo,
 	}
 }
 
@@ -67,6 +71,7 @@ func (d *InfluxDbFirehoseNozzle) createClient() {
  		d.config.Deployment,
  		ipAddress,
  		d.log,
+		d.appinfo,
  	)
 }
 
@@ -134,7 +139,23 @@ func (d *InfluxDbFirehoseNozzle) handleError(err error) {
 }
 
 func (d *InfluxDbFirehoseNozzle) keepMessage(envelope *events.Envelope) bool {
-	return d.config.DeploymentFilter == "" || d.config.DeploymentFilter == envelope.GetDeployment()
+	var event string 
+
+	switch envelope.GetEventType() {
+	case events.Envelope_ContainerMetric:
+		event = "ContainerMetric"
+	case events.Envelope_CounterEvent:
+		event = "CounterEvent"
+	case events.Envelope_HttpStartStop:
+		event = "HttpStartStop"
+	case events.Envelope_ValueMetric:
+		event = "ValueMetric"
+	default:
+		event = "unsupported"
+		return false
+	}
+				
+	return (d.config.DeploymentFilter == "" || d.config.DeploymentFilter == envelope.GetDeployment()) && (d.config.EventFilter == "" || strings.Contains(d.config.EventFilter, event))
 }
 
 func (d *InfluxDbFirehoseNozzle) handleMessage(envelope *events.Envelope) {

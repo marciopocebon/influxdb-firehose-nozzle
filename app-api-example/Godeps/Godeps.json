@@ -1,0 +1,27 @@
+{
+	"ImportPath": "github.com/evoila/influxdb-firehose-nozzle/app-api-example",
+	"GoVersion": "go1.7",
+	"GodepVersion": "v75",
+	"Deps": [
+		{
+			"ImportPath": "github.com/cloudfoundry-community/go-cfclient",
+			"Rev": "7b15efc43291ece6f107ed34f9684ff5f6454de3"
+		},
+		{
+			"ImportPath": "golang.org/x/net/context",
+			"Rev": "60c41d1de8da134c05b7b40154a9a82bf5b7edb9"
+		},
+		{
+			"ImportPath": "golang.org/x/oauth2",
+			"Rev": "314dd2c0bf3ebd592ec0d20847d27e79d0dbe8dd"
+		},
+		{
+			"ImportPath": "golang.org/x/oauth2/clientcredentials",
+			"Rev": "314dd2c0bf3ebd592ec0d20847d27e79d0dbe8dd"
+		},
+		{
+			"ImportPath": "golang.org/x/oauth2/internal",
+			"Rev": "314dd2c0bf3ebd592ec0d20847d27e79d0dbe8dd"
+		}
+	]
+}

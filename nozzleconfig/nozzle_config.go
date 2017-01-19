@@ -24,8 +24,10 @@ type NozzleConfig struct {
 	MetricPrefix           string
 	Deployment             string
 	DeploymentFilter       string
+	EventFilter            string
 	DisableAccessControl   bool
 	IdleTimeoutSeconds     uint32
+	AppInfoApiUrl	       string
 }
 
 func Parse(configPath string) (*NozzleConfig, error) {
@@ -53,12 +55,15 @@ func Parse(configPath string) (*NozzleConfig, error) {
 	overrideWithEnvVar("NOZZLE_METRICPREFIX", &config.MetricPrefix)
 	overrideWithEnvVar("NOZZLE_DEPLOYMENT", &config.Deployment)
 	overrideWithEnvVar("NOZZLE_DEPLOYMENT_FILTER", &config.DeploymentFilter)
+	overrideWithEnvVar("NOZZLE_EVENT_FILTER", &config.EventFilter)
 
 	overrideWithEnvUint32("NOZZLE_FLUSHDURATIONSECONDS", &config.FlushDurationSeconds)
 
 	overrideWithEnvBool("NOZZLE_SSL_SKIPVERIFY", &config.SsLSkipVerify)
 	overrideWithEnvBool("NOZZLE_DISABLEACCESSCONTROL", &config.DisableAccessControl)
 	overrideWithEnvUint32("NOZZLE_IDLETIMEOUTSECONDS", &config.IdleTimeoutSeconds)
+	overrideWithEnvVar("NOZZLE_APP_API_URL", &config.AppInfoApiUrl)
+
 	return &config, nil
 }
 

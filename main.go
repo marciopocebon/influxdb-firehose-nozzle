@@ -3,22 +3,18 @@ package main
 import (
 	"flag"
 	"io"
-
+	"strings"
 	"net/http"
 	"os"
 	"os/signal"
 	"runtime/pprof"
 	"syscall"
 
-//	"github.com/evoila/influxdb-firehose-nozzle/influxdbfirehosenozzle"
-//	"github.com/evoila/influxdb-firehose-nozzle/nozzleconfig"
-//        "github.com/evoila/influxdb-firehose-nozzle/logger"
-//	"github.com/evoila/influxdb-firehose-nozzle/uaatokenfetcher"
-
         "github.com/evoila/influxdb-firehose-nozzle/influxdbfirehosenozzle"
         "github.com/evoila/influxdb-firehose-nozzle/nozzleconfig"
         "github.com/evoila/influxdb-firehose-nozzle/logger"
         "github.com/evoila/influxdb-firehose-nozzle/uaatokenfetcher"
+	"github.com/evoila/influxdb-firehose-nozzle/cfinstanceinfoapi"
 )
 
 var (
@@ -26,6 +22,7 @@ var (
  	logLevel    = flag.Bool("debug", false, "Debug logging")
      	configFile  = flag.String("config", "config/influxdb-firehose-nozzle.json", "Location of the nozzle config json file")
 )
+
 func main() {
 	flag.Parse()
         
@@ -49,8 +46,15 @@ func main() {
 	go dumpGoRoutine(threadDumpChan)
 
 	go runServer()
+	appmap := make(map[string]cfinstanceinfoapi.AppInfo)
 
-	influxDbNozzle := influxdbfirehosenozzle.NewInfluxDbFirehoseNozzle(config, tokenFetcher, log)
+	log.Infof("Capturing events of type: " + config.EventFilter)
+	if (strings.Contains(config.EventFilter,"HttpStartStop") || strings.Contains(config.EventFilter,"ContainerMetric")) {
+		cfinstanceinfoapi.GenAppMap(config, appmap)
+        	go cfinstanceinfoapi.UpdateAppMap(config, appmap)
+	}
+
+	influxDbNozzle := influxdbfirehosenozzle.NewInfluxDbFirehoseNozzle(config, tokenFetcher, log, appmap)
 	influxDbNozzle.Start()
 }
 

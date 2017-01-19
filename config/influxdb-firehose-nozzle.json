@@ -1,7 +1,7 @@
 {
   "UAAURL": "https://uaa.onevoila.rocks",
-  "Username": "influxdb-firehose-nozzle",
-  "Password": "c1oudc0w",
+  "Client": "influxdb-firehose-nozzle",
+  "ClientSecret": "c1oudc0w",
   "TrafficControllerURL": "wss://doppler.onevoila.rocks:4443",
   "FirehoseSubscriptionID": "influxdb-firehose-nozzle",
   "InfluxDbUrl": "https://88.198.249.61:8086",
@@ -13,6 +13,10 @@
   "SsLSkipVerify": true,
   "MetricPrefix": "cf",
   "Deployment": "cf-ops",
+  "DeploymentFilter": "deployment-filter",
+  "EventFilter": "CounterEvent, ValueMetric",
   "DisableAccessControl": false,
-  "IdleTimeoutSeconds" : 60
+  "IdleTimeoutSeconds" : 60,
+  "AppInfoApiUrl": "http://appapi.cf.company.com/rest/apps/"
 }
+
