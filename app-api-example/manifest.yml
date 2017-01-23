@@ -1,0 +1,11 @@
+---
+applications:
+- name: cfapp-api
+  memory: 64M
+  disk_quota: 64M
+  instances: 1
+  env:
+    API_ADDRESS: https://api.cf.company.com
+    CF_USER: admin
+    SKIP_SSL: true
+    CF_PASSWORD: secret

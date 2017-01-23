@@ -29,6 +29,26 @@ You can start the firehose nozzle by executing:
 go run main.go -config config/influxdb-firehose-nozzle.json"
 ```
 
+### Firehose Event Type Filtering
+
+The firehose exports four main event types: ContainerMetric, CounterEvent, HttpStartStop, ValueMetric.  The event types the nozzle will export can be selected via the json configuration file or via enviornment variables.  
+
+If you plan to export HTttpStartStop or ContainerMetrics, you will need to specify the path to a secondary service which exports information about the applications in cloud foundry which will be included as tags to the influxdb data points.  Specifically the service is expected to export json in the following format:
+```
+[{
+  "name": "app1",
+  "guid": "d5697f98-1a94-4d92-a93b-6ba812c9f67a",
+  "space": "testing",
+  "org": "myorg"
+}, {
+  "name": "app2",
+  "guid": "164686ca-0c4f-42b7-95d3-3b1ee0fb095c",
+  "space": "testing",
+  "org": "myorg"
+}]
+```
+If you do not have a centralized service for providing this information in your enviornment already, a sample application is included in this repository [for you to use](app-api-example).  
+
 ### Batching
 
 The configuration file specifies the interval at which the nozzle will flush metrics to influxdb. By default this is set to 15 seconds.
@@ -90,6 +110,7 @@ ltc create influxdb-nozzle cloudfoundry/influxdb-nozzle-lattice \
   -e NOZZLE_METRIC_PREFIX=<METRIC PREFIX> \
   -e NOZZLE_TRAFFICCONTROLLERURL=<TRAFFICONTROLLER URL>
 ```
+### Configuration 
 
 Any of the configuration parameters can be overloaded by using environment variables. The following
 parameters are supported
@@ -97,8 +118,8 @@ parameters are supported
 | Environment variable          | Description            |
 |-------------------------------|------------------------|
 | NOZZLE_UAAURL                 | UAA URL which the nozzle uses to get an authentication token for the firehose |
-| NOZZLE_USERNAME               | User who has access to the firehose |
-| NOZZLE_PASSWORD               | Password for the user |
+| NOZZLE_CLIENT                 | Client who has access to the firehose |
+| NOZZLE_CLIENT_SECRET          | Secret for the client |
 | NOZZLE_TRAFFICCONTROLLERURL   | Loggregator's traffic controller URL |
 | NOZZLE_FIREHOSESUBSCRIPTIONID | Subscription ID used when connecting to the firehose. Nozzles with the same subscription ID get a proportional share of the firehose |
 | NOZZLE_INFLUXDB_URL           | The influxdb API URL |
@@ -107,9 +128,13 @@ parameters are supported
 | NOZZLE_INFLUXDB_PASSWORD      | The password name used when publishing metrics to influxdb |
 | NOZZLE_METRICPREFIX           | The metric prefix is prepended to all metrics flowing through the nozzle |
 | NOZZLE_DEPLOYMENT             | The deployment name for the nozzle. Used for tagging metrics internal to the nozzle |
+| NOZZLE_DEPLOYMENT_FILTER      | If set, the nozzle will only send metrics with this deployment name |
+| NOZZLE_EVENT_FILTER           | If set, the nozzle will only send metrics from these event types (Ex. (ContainerMetric, CounterEvent, HttpStartStop, ValueMetric) |
+| NOZZLE_APP_API_URL            | Url of the service which provides a list of cf apps and their information. Only used if ContainerMetric or HttpStartStop events are enabled |
 | NOZZLE_FLUSHDURATIONSECONDS   | Number of seconds to buffer data before publishing to influxdb |
 | NOZZLE_INSECURESSLSKIPVERIFY  | If true, allows insecure connections to the UAA and the Trafficcontroller |
 | NOZZLE_DISABLEACCESSCONTROL   | If true, disables authentication with the UAA. Used in lattice deployments |
 
 ### CI
 The concourse pipeline for the influxdb nozzle is present here: https://concourse.walnut.cf-app.com/pipelines/nozzles?groups=influxdb-nozzle
+

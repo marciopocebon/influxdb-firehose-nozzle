@@ -1,33 +1,36 @@
 package influxdbfirehosenozzle_test
 
 import (
+        "bytes"
+
 	. "github.com/evoila/influxdb-firehose-nozzle/testhelpers"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
 	"encoding/json"
 	"fmt"
-	"log"
-	"strings"
-	"time"
 
 	"github.com/cloudfoundry/sonde-go/events"
+        "github.com/cloudfoundry/gosteno"
 	"github.com/evoila/influxdb-firehose-nozzle/influxdbclient"
 	"github.com/evoila/influxdb-firehose-nozzle/influxdbfirehosenozzle"
 	"github.com/evoila/influxdb-firehose-nozzle/nozzleconfig"
 	"github.com/evoila/influxdb-firehose-nozzle/uaatokenfetcher"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gorilla/websocket"
-	"github.com/onsi/gomega/gbytes"
 )
 
 var _ = Describe("Datadog Firehose Nozzle", func() {
-	var fakeUAA *FakeUAA
-	var fakeFirehose *FakeFirehose
-	var influxDbAPI *FakeInfluxDbAPI
-	var config *nozzleconfig.NozzleConfig
-	var nozzle *influxdbfirehosenozzle.InfluxDbFirehoseNozzle
-	var logOutput *gbytes.Buffer
+	var (
+               fakeUAA *FakeUAA
+	       fakeFirehose *FakeFirehose
+	       influxDbAPI *FakeInfluxDbAPI
+	       config *nozzleconfig.NozzleConfig
+	       nozzle *influxdbfirehosenozzle.InfluxDbFirehoseNozzle
+	       log    *gosteno.Logger
+               logContent     *bytes.Buffer
+               fakeBuffer     *FakeBufferSink
+        )
 
 	BeforeEach(func() {
 		fakeUAA = NewFakeUAA("bearer", "123456789")
@@ -39,10 +42,6 @@ var _ = Describe("Datadog Firehose Nozzle", func() {
 		fakeFirehose.Start()
 		influxDbAPI.Start()
 
-		tokenFetcher := &uaatokenfetcher.UAATokenFetcher{
-			UaaUrl: fakeUAA.URL(),
-		}
-
 		config = &nozzleconfig.NozzleConfig{
 			UAAURL:               fakeUAA.URL(),
 			FlushDurationSeconds: 10,
@@ -50,11 +49,23 @@ var _ = Describe("Datadog Firehose Nozzle", func() {
 			TrafficControllerURL: strings.Replace(fakeFirehose.URL(), "http:", "ws:", 1),
 			DisableAccessControl: false,
 			MetricPrefix:         "datadog.nozzle.",
+			Deployment:           "nozzle-deployment",
 		}
+                content := make([]byte, 1024)
+		logContent = bytes.NewBuffer(content)
+		fakeBuffer = NewFakeBufferSink(logContent)
+		c := &gosteno.Config{
+			Sinks: []gosteno.Sink{
+				fakeBuffer,
+			},
+		}
+		gosteno.Init(c)
+		log = gosteno.NewLogger("test")
+	})
 
-		logOutput = gbytes.NewBuffer()
-		log.SetOutput(logOutput)
-		nozzle = influxdbfirehosenozzle.NewInfluxDbFirehoseNozzle(config, tokenFetcher)
+	JustBeforeEach(func() {
+		tokenFetcher := uaatokenfetcher.New(fakeUAA.URL(), "un", "pwd", true, log)
+		nozzle = influxdbfirehosenozzle.NewInfluxDbFirehoseNozzle(config, tokenFetcher, log)
 	})
 
 	AfterEach(func() {
@@ -90,8 +101,6 @@ var _ = Describe("Datadog Firehose Nozzle", func() {
 		var payload influxdbclient.Payload
 		err := json.Unmarshal(contents, &payload)
 		Expect(err).ToNot(HaveOccurred())
-
-		Expect(logOutput).ToNot(gbytes.Say("Error while reading from the firehose"))
 
 		// +3 internal metrics that show totalMessagesReceived, totalMetricSent, and slowConsumerAlert
 		Expect(payload.Series).To(HaveLen(13))
@@ -133,9 +142,10 @@ var _ = Describe("Datadog Firehose Nozzle", func() {
 		Expect(slowConsumerMetric.Points).To(HaveLen(1))
 		Expect(slowConsumerMetric.Points[0].Value).To(BeEquivalentTo(1))
 
-		Expect(logOutput).To(gbytes.Say("Error while reading from the firehose"))
-		Expect(logOutput).To(gbytes.Say("Client did not respond to ping before keep-alive timeout expired."))
-		Expect(logOutput).To(gbytes.Say("Disconnected because nozzle couldn't keep up."))
+		logOutput := fakeBuffer.GetContent()
+		Expect(logOutput).To(ContainSubstring("Error while reading from the firehose"))
+		Expect(logOutput).To(ContainSubstring("Client did not respond to ping before keep-alive timeout expired."))
+		Expect(logOutput).To(ContainSubstring("Disconnected because nozzle couldn't keep up."))
 	}, 2)
 
 	It("does not report slow consumer error when closed for other reasons", func(done Done) {
@@ -156,9 +166,10 @@ var _ = Describe("Datadog Firehose Nozzle", func() {
 		Expect(errMetric).NotTo(BeNil())
 		Expect(errMetric.Points[0].Value).To(BeEquivalentTo(0))
 
-		Expect(logOutput).To(gbytes.Say("Error while reading from the firehose"))
-		Expect(logOutput).NotTo(gbytes.Say("Client did not respond to ping before keep-alive timeout expired."))
-		Expect(logOutput).NotTo(gbytes.Say("Disconnected because nozzle couldn't keep up."))
+		logOutput := fakeBuffer.GetContent()
+		Expect(logOutput).To(ContainSubstring("Error while reading from the firehose"))
+		Expect(logOutput).NotTo(ContainSubstring("Client did not respond to ping before keep-alive timeout expired."))
+		Expect(logOutput).NotTo(ContainSubstring("Disconnected because nozzle couldn't keep up."))
 	}, 2)
 
 	It("gets a valid authentication token", func() {
@@ -194,7 +205,7 @@ var _ = Describe("Datadog Firehose Nozzle", func() {
 
 			Expect(findSlowConsumerMetric(payload)).NotTo(BeNil())
 
-			Expect(logOutput).To(gbytes.Say("We've intercepted an upstream message which indicates that the nozzle or the TrafficController is not keeping up. Please try scaling up the nozzle."))
+			Expect(fakeBuffer.GetContent()).To(ContainSubstring("We've intercepted an upstream message which indicates that the nozzle or the TrafficController is not keeping up. Please try scaling up the nozzle."))
 		})
 	})
 
@@ -219,7 +230,7 @@ var _ = Describe("Datadog Firehose Nozzle", func() {
 				DisableAccessControl: true,
 			}
 
-			nozzle = datadogfirehosenozzle.NewDatadogFirehoseNozzle(config, tokenFetcher)
+			nozzle = datadogfirehosenozzle.NewDatadogFirehoseNozzle(config, tokenFetcher, log)
 		})
 
 		AfterEach(func() {
@@ -260,7 +271,7 @@ var _ = Describe("Datadog Firehose Nozzle", func() {
 			}
 
 			tokenFetcher := &FakeTokenFetcher{}
-			nozzle = datadogfirehosenozzle.NewDatadogFirehoseNozzle(config, tokenFetcher)
+			nozzle = datadogfirehosenozzle.NewDatadogFirehoseNozzle(config, tokenFetcher, log)
 		})
 		AfterEach(func() {
 			fakeIdleFirehose.Close()
@@ -272,6 +283,38 @@ var _ = Describe("Datadog Firehose Nozzle", func() {
 			Expect(err.Error()).To(ContainSubstring("i/o timeout"))
 		})
 	})
+
+	Context("with DeploymentFilter provided", func() {
+		BeforeEach(func() {
+			config.DeploymentFilter = "good-deployment-name"
+		})
+
+		JustBeforeEach(func() {
+			go nozzle.Start()
+		})
+
+		It("includes messages that match deployment filter", func() {
+			goodEnvelope := events.Envelope{
+				Origin:     proto.String("origin"),
+				Timestamp:  proto.Int64(1000000000),
+				Deployment: proto.String("good-deployment-name"),
+			}
+			fakeFirehose.AddEvent(goodEnvelope)
+			Eventually(fakeDatadogAPI.ReceivedContents).Should(Receive())
+		})
+
+		It("filters out messages from other deployments", func() {
+			badEnvelope := events.Envelope{
+				Origin:     proto.String("origin"),
+				Timestamp:  proto.Int64(1000000000),
+				Deployment: proto.String("bad-deployment-name"),
+			}
+			fakeFirehose.AddEvent(badEnvelope)
+
+			rxContents := filterOutNozzleMetrics(config.Deployment, FakeInfluxDbAPI.ReceivedContents)
+			Consistently(rxContents).ShouldNot(Receive())
+		})
+	})
 })
 
 func findSlowConsumerMetric(payload datadogclient.Payload) *datadogclient.Metric {
@@ -281,4 +324,17 @@ func findSlowConsumerMetric(payload datadogclient.Payload) *datadogclient.Metric
 		}
 	}
 	return nil
+}
+
+func filterOutNozzleMetrics(deployment string, c <-chan []byte) <-chan []byte {
+	filter := "deployment:" + deployment
+	result := make(chan []byte)
+	go func() {
+		for b := range c {
+			if !strings.Contains(string(b), filter) {
+				result <- b
+			}
+		}
+	}()
+	return result
 }
