@@ -140,7 +140,6 @@ func (d *InfluxDbFirehoseNozzle) handleError(err error) {
 
 func (d *InfluxDbFirehoseNozzle) keepMessage(envelope *events.Envelope) bool {
 	var event string
-	d.log.Infof("Type: %v", envelope.GetEventType())
 
 	switch envelope.GetEventType() {
 	case events.Envelope_ContainerMetric:
@@ -151,6 +150,7 @@ func (d *InfluxDbFirehoseNozzle) keepMessage(envelope *events.Envelope) bool {
 		event = "HttpStartStop"
 	case events.Envelope_ValueMetric:
 		event = "ValueMetric"
+		d.log.Infof("value")
 	default:
 		event = "unsupported"
 		return false
