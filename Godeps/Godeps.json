@@ -39,7 +39,7 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/sonde-go/events",
-			"Rev": "3d364d9ed49fee2f9fdcba278199127462cae3c4"
+			"Rev": "78019103037ae46207993c8816e970d85bf1a9e4"
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/gogoproto",

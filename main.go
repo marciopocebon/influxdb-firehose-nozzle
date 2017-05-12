@@ -3,29 +3,29 @@ package main
 import (
 	"flag"
 	"io"
-	"strings"
 	"net/http"
 	"os"
 	"os/signal"
 	"runtime/pprof"
+	"strings"
 	"syscall"
 
-        "github.com/evoila/influxdb-firehose-nozzle/influxdbfirehosenozzle"
-        "github.com/evoila/influxdb-firehose-nozzle/nozzleconfig"
-        "github.com/evoila/influxdb-firehose-nozzle/logger"
-        "github.com/evoila/influxdb-firehose-nozzle/uaatokenfetcher"
 	"github.com/evoila/influxdb-firehose-nozzle/cfinstanceinfoapi"
+	"github.com/evoila/influxdb-firehose-nozzle/influxdbfirehosenozzle"
+	"github.com/evoila/influxdb-firehose-nozzle/logger"
+	"github.com/evoila/influxdb-firehose-nozzle/nozzleconfig"
+	"github.com/evoila/influxdb-firehose-nozzle/uaatokenfetcher"
 )
 
 var (
- 	logFilePath = flag.String("logFile", "", "The agent log file, defaults to STDOUT")
- 	logLevel    = flag.Bool("debug", false, "Debug logging")
-     	configFile  = flag.String("config", "config/influxdb-firehose-nozzle.json", "Location of the nozzle config json file")
+	logFilePath = flag.String("logFile", "", "The agent log file, defaults to STDOUT")
+	logLevel    = flag.Bool("debug", false, "Debug logging")
+	configFile  = flag.String("config", "config/influxdb-firehose-nozzle.json", "Location of the nozzle config json file")
 )
 
 func main() {
 	flag.Parse()
-        
+
 	log := logger.NewLogger(*logLevel, *logFilePath, "influxdb-firehose-nozzle", "")
 
 	config, err := nozzleconfig.Parse(*configFile)
@@ -33,13 +33,13 @@ func main() {
 		log.Fatalf("Error parsing config: %s", err.Error())
 	}
 
-        tokenFetcher := uaatokenfetcher.New(
- 		config.UAAURL,
- 		config.Client,
- 		config.ClientSecret,
- 		config.SsLSkipVerify,
- 		log,
- 	)
+	tokenFetcher := uaatokenfetcher.New(
+		config.UAAURL,
+		config.Client,
+		config.ClientSecret,
+		config.SsLSkipVerify,
+		log,
+	)
 
 	threadDumpChan := registerGoRoutineDumpSignalChannel()
 	defer close(threadDumpChan)
@@ -49,9 +49,9 @@ func main() {
 	appmap := make(map[string]cfinstanceinfoapi.AppInfo)
 
 	log.Infof("Capturing events of type: " + config.EventFilter)
-	if (strings.Contains(config.EventFilter,"HttpStartStop") || strings.Contains(config.EventFilter,"ContainerMetric")) {
+	if strings.Contains(config.EventFilter, "HttpStartStop") || strings.Contains(config.EventFilter, "ContainerMetric") {
 		cfinstanceinfoapi.GenAppMap(config, appmap)
-        	go cfinstanceinfoapi.UpdateAppMap(config, appmap)
+		go cfinstanceinfoapi.UpdateAppMap(config, appmap)
 	}
 
 	influxDbNozzle := influxdbfirehosenozzle.NewInfluxDbFirehoseNozzle(config, tokenFetcher, log, appmap)
