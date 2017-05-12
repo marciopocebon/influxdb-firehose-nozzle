@@ -2,28 +2,28 @@ package influxdbfirehosenozzle
 
 import (
 	"crypto/tls"
-	"time"
 	"strings"
+	"time"
 
+	"github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/noaa/consumer"
 	noaaerrors "github.com/cloudfoundry/noaa/errors"
-        "github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/sonde-go/events"
+	"github.com/evoila/influxdb-firehose-nozzle/cfinstanceinfoapi"
 	"github.com/evoila/influxdb-firehose-nozzle/influxdbclient"
 	"github.com/evoila/influxdb-firehose-nozzle/nozzleconfig"
 	"github.com/gorilla/websocket"
 	"github.com/pivotal-golang/localip"
-	"github.com/evoila/influxdb-firehose-nozzle/cfinstanceinfoapi"
 )
 
 type InfluxDbFirehoseNozzle struct {
 	config           *nozzleconfig.NozzleConfig
-        errs             <-chan error
-        messages         <-chan *events.Envelope
+	errs             <-chan error
+	messages         <-chan *events.Envelope
 	authTokenFetcher AuthTokenFetcher
-        consumer         *consumer.Consumer
+	consumer         *consumer.Consumer
 	client           *influxdbclient.Client
-        log              *gosteno.Logger
+	log              *gosteno.Logger
 	appinfo          map[string]cfinstanceinfoapi.AppInfo
 }
 
@@ -35,7 +35,7 @@ func NewInfluxDbFirehoseNozzle(config *nozzleconfig.NozzleConfig, tokenFetcher A
 	return &InfluxDbFirehoseNozzle{
 		config:           config,
 		authTokenFetcher: tokenFetcher,
-                log:              log,
+		log:              log,
 		appinfo:          appinfo,
 	}
 }
@@ -63,16 +63,16 @@ func (d *InfluxDbFirehoseNozzle) createClient() {
 
 	d.client = influxdbclient.New(
 		d.config.InfluxDbUrl,
- 		d.config.InfluxDbDatabase,
+		d.config.InfluxDbDatabase,
 		d.config.InfluxDbUser,
 		d.config.InfluxDbPassword,
 		d.config.InfluxDbSslSkipVerify,
- 		d.config.MetricPrefix,
- 		d.config.Deployment,
- 		ipAddress,
- 		d.log,
+		d.config.MetricPrefix,
+		d.config.Deployment,
+		ipAddress,
+		d.log,
 		d.appinfo,
- 	)
+	)
 }
 
 func (d *InfluxDbFirehoseNozzle) consumeFirehose(authToken string) {
@@ -92,6 +92,7 @@ func (d *InfluxDbFirehoseNozzle) postToInfluxDb() error {
 			d.postMetrics()
 		case envelope := <-d.messages:
 			if !d.keepMessage(envelope) {
+				d.log.Info("Message arrived")
 				continue
 			}
 
@@ -139,7 +140,7 @@ func (d *InfluxDbFirehoseNozzle) handleError(err error) {
 }
 
 func (d *InfluxDbFirehoseNozzle) keepMessage(envelope *events.Envelope) bool {
-	var event string 
+	var event string
 
 	switch envelope.GetEventType() {
 	case events.Envelope_ContainerMetric:
@@ -154,7 +155,7 @@ func (d *InfluxDbFirehoseNozzle) keepMessage(envelope *events.Envelope) bool {
 		event = "unsupported"
 		return false
 	}
-				
+
 	return (d.config.DeploymentFilter == "" || d.config.DeploymentFilter == envelope.GetDeployment()) && (d.config.EventFilter == "" || strings.Contains(d.config.EventFilter, event))
 }
 
