@@ -95,6 +95,7 @@ func (d *InfluxDbFirehoseNozzle) postToInfluxDb() error {
 				continue
 			}
 
+			d.log.Infof("value")
 			d.handleMessage(envelope)
 			d.client.AddMetric(envelope)
 		case err := <-d.errs:
@@ -150,7 +151,6 @@ func (d *InfluxDbFirehoseNozzle) keepMessage(envelope *events.Envelope) bool {
 		event = "HttpStartStop"
 	case events.Envelope_ValueMetric:
 		event = "ValueMetric"
-		d.log.Infof("value")
 	default:
 		event = "unsupported"
 		return false
