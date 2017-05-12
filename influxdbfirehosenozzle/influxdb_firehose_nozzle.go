@@ -92,7 +92,6 @@ func (d *InfluxDbFirehoseNozzle) postToInfluxDb() error {
 			d.postMetrics()
 		case envelope := <-d.messages:
 			if !d.keepMessage(envelope) {
-				d.log.Info("Message arrived")
 				continue
 			}
 
@@ -141,6 +140,7 @@ func (d *InfluxDbFirehoseNozzle) handleError(err error) {
 
 func (d *InfluxDbFirehoseNozzle) keepMessage(envelope *events.Envelope) bool {
 	var event string
+	d.log.Infof("Type: %v", envelope.GetEventType())
 
 	switch envelope.GetEventType() {
 	case events.Envelope_ContainerMetric:
