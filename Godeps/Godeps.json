@@ -1,23 +1,60 @@
 {
 	"ImportPath": "github.com/evoila/influxdb-firehose-nozzle",
 	"GoVersion": "go1.5.3",
+	"GodepVersion": "v79",
 	"Deps": [
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/uaago",
 			"Rev": "5253fdf54e4a464366e5ffa8e5f456f5f1e50a2f"
 		},
 		{
+			"ImportPath": "github.com/cloudfoundry/gosteno",
+			"Comment": "scotty_09012012-42-g0c8581c",
+			"Rev": "0c8581caea35ac903728230e447792e2365dcc34"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/gosteno/syslog",
+			"Comment": "scotty_09012012-42-g0c8581c",
+			"Rev": "0c8581caea35ac903728230e447792e2365dcc34"
+		},
+		{
 			"ImportPath": "github.com/cloudfoundry/noaa",
-			"Rev": "8c9fd92c47a3ef39993b2f0496cc25992f87c01a"
+			"Comment": "v2.0.0-11-g89f0843",
+			"Rev": "89f0843d0ab59863cc78fc44ca5e4ed8c986677e"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/noaa/consumer",
+			"Comment": "v2.0.0-11-g89f0843",
+			"Rev": "89f0843d0ab59863cc78fc44ca5e4ed8c986677e"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/noaa/consumer/internal",
+			"Comment": "v2.0.0-11-g89f0843",
+			"Rev": "89f0843d0ab59863cc78fc44ca5e4ed8c986677e"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/noaa/errors",
+			"Comment": "v2.0.0-11-g89f0843",
+			"Rev": "89f0843d0ab59863cc78fc44ca5e4ed8c986677e"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/sonde-go/events",
 			"Rev": "3d364d9ed49fee2f9fdcba278199127462cae3c4"
 		},
 		{
+			"ImportPath": "github.com/gogo/protobuf/gogoproto",
+			"Comment": "v0.4-8-g30433562",
+			"Rev": "30433562cfbf487fe1df7cd26c7bab168d2f14d0"
+		},
+		{
 			"ImportPath": "github.com/gogo/protobuf/proto",
-			"Comment": "v0.1-108-g9dc5109",
-			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
+			"Comment": "v0.4-8-g30433562",
+			"Rev": "30433562cfbf487fe1df7cd26c7bab168d2f14d0"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/protoc-gen-gogo/descriptor",
+			"Comment": "v0.4-8-g30433562",
+			"Rev": "30433562cfbf487fe1df7cd26c7bab168d2f14d0"
 		},
 		{
 			"ImportPath": "github.com/gorilla/websocket",
