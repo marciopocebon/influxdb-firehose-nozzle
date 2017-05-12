@@ -95,7 +95,6 @@ func (d *InfluxDbFirehoseNozzle) postToInfluxDb() error {
 				continue
 			}
 
-			d.log.Infof("value")
 			d.handleMessage(envelope)
 			d.client.AddMetric(envelope)
 		case err := <-d.errs:
