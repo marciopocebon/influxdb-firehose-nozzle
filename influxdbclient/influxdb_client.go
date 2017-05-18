@@ -257,7 +257,6 @@ func (c *Client) PostMetrics() error {
 	c.log.Infof("Posting %d metrics", numMetrics)
 
 	seriesBytes, metricsCount := c.formatMetrics()
-	c.log.Infof("Posting data %s", seriesBytes)
 
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
