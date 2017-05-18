@@ -2,17 +2,17 @@ package influxdbclient
 
 import (
 	"bytes"
+	"crypto/sha1"
 	"crypto/tls"
-        "crypto/sha1"
+	"encoding/binary"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
-	"sort"
-	"encoding/binary"
 
-        "github.com/cloudfoundry/gosteno"
+	"github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/evoila/influxdb-firehose-nozzle/cfinstanceinfoapi"
 )
@@ -27,17 +27,17 @@ type Client struct {
 	prefix                string
 	deployment            string
 	ip                    string
-        tagsHash	      string
+	tagsHash              string
 	totalMessagesReceived uint64
 	totalMetricsSent      uint64
-        log                   *gosteno.Logger
+	log                   *gosteno.Logger
 	appinfo               map[string]cfinstanceinfoapi.AppInfo
 }
 
 type metricKey struct {
-	eventType  events.Envelope_EventType
-	name       string
-        tagsHash   string
+	eventType events.Envelope_EventType
+	name      string
+	tagsHash  string
 }
 
 type metricValue struct {
@@ -59,7 +59,7 @@ type Point struct {
 }
 
 func New(url string, database string, user string, password string, allowSelfSigned bool, prefix string, deployment string, ip string, log *gosteno.Logger, appinfo map[string]cfinstanceinfoapi.AppInfo) *Client {
-        ourTags := []string{
+	ourTags := []string{
 		"deployment:" + deployment,
 		"ip:" + ip,
 	}
@@ -73,8 +73,8 @@ func New(url string, database string, user string, password string, allowSelfSig
 		prefix:          prefix,
 		deployment:      deployment,
 		ip:              ip,
-		log:		 log,
-		tagsHash:	 hashTags(ourTags),
+		log:             log,
+		tagsHash:        hashTags(ourTags),
 		appinfo:         appinfo,
 	}
 }
@@ -100,45 +100,45 @@ func (c *Client) AddMetric(envelope *events.Envelope) {
 
 func (c *Client) AddHttpStartStopMetric(envelope *events.Envelope) {
 	if envelope.GetHttpStartStop().GetApplicationId() != nil {
-        	tags := parseTags(envelope, c)
+		tags := parseTags(envelope, c)
 		types := []string{"httprequest.duration_ms", "httprequest.size_bytes"}
 
-		for v := range types{
+		for v := range types {
 			switch types[v] {
 			case "httprequest.duration_ms":
 				key := metricKey{
-        				eventType:  envelope.GetEventType(),
-                			name:       envelope.GetOrigin() + ".container_" + types[v],
-                			tagsHash:   hashTags(tags),
-        			}
-        			mVal := c.metricPoints[key]
-        			value := (envelope.GetHttpStartStop().GetStopTimestamp() - envelope.GetHttpStartStop().GetStartTimestamp()) / 1e6
-					if value < 0 {
-						value = 0 
-					} 
-        			mVal.tags = tags
-        			mVal.points = append(mVal.points, Point{
-        				Timestamp: envelope.GetTimestamp() / int64(time.Second),
-               				Value:     float64(value),
+					eventType: envelope.GetEventType(),
+					name:      envelope.GetOrigin() + ".container_" + types[v],
+					tagsHash:  hashTags(tags),
+				}
+				mVal := c.metricPoints[key]
+				value := (envelope.GetHttpStartStop().GetStopTimestamp() - envelope.GetHttpStartStop().GetStartTimestamp()) / 1e6
+				if value < 0 {
+					value = 0
+				}
+				mVal.tags = tags
+				mVal.points = append(mVal.points, Point{
+					Timestamp: envelope.GetTimestamp() / int64(time.Second),
+					Value:     float64(value),
 				})
 				c.metricPoints[key] = mVal
 			case "httprequest.size_bytes":
 				key := metricKey{
-                                        eventType:  envelope.GetEventType(),
-                                        name:       envelope.GetOrigin() + ".container_" + types[v],
-                                        tagsHash:   hashTags(tags),
-                                }
-                                mVal := c.metricPoints[key]
-                                value := envelope.GetHttpStartStop().GetContentLength() 
-					if value < 0 {
-                                                value = 0
-                                        }
-                                mVal.tags = tags
-                                mVal.points = append(mVal.points, Point{
-                                        Timestamp: envelope.GetTimestamp() / int64(time.Second),
-                                        Value:     float64(value),
-                                })
-                                c.metricPoints[key] = mVal
+					eventType: envelope.GetEventType(),
+					name:      envelope.GetOrigin() + ".container_" + types[v],
+					tagsHash:  hashTags(tags),
+				}
+				mVal := c.metricPoints[key]
+				value := envelope.GetHttpStartStop().GetContentLength()
+				if value < 0 {
+					value = 0
+				}
+				mVal.tags = tags
+				mVal.points = append(mVal.points, Point{
+					Timestamp: envelope.GetTimestamp() / int64(time.Second),
+					Value:     float64(value),
+				})
+				c.metricPoints[key] = mVal
 			}
 		}
 	}
@@ -146,102 +146,101 @@ func (c *Client) AddHttpStartStopMetric(envelope *events.Envelope) {
 
 func (c *Client) AddContainerMetric(envelope *events.Envelope) {
 	types := []string{"cpu", "mem_bytes", "mem_bytes_quota", "disk_bytes", "disk_bytes_quota"}
-        tags := parseTags(envelope, c)
+	tags := parseTags(envelope, c)
 
 	for v := range types {
 		switch types[v] {
-                case "cpu":
+		case "cpu":
 			key := metricKey{
-                		eventType:  envelope.GetEventType(),
-                		name:       envelope.GetOrigin() + ".container_" + types[v],
-                		tagsHash:   hashTags(tags),
-        		}
+				eventType: envelope.GetEventType(),
+				name:      envelope.GetOrigin() + ".container_" + types[v],
+				tagsHash:  hashTags(tags),
+			}
 			mVal := c.metricPoints[key]
-                        value := envelope.GetContainerMetric().GetCpuPercentage()
-			
+			value := envelope.GetContainerMetric().GetCpuPercentage()
+
 			mVal.tags = tags
-        		mVal.points = append(mVal.points, Point{
-                		Timestamp: envelope.GetTimestamp() / int64(time.Second),
-                		Value:     value,
-        		})
+			mVal.points = append(mVal.points, Point{
+				Timestamp: envelope.GetTimestamp() / int64(time.Second),
+				Value:     value,
+			})
 			c.metricPoints[key] = mVal
 		case "mem_bytes":
 			key := metricKey{
-                                eventType:  envelope.GetEventType(),
-                                name:       envelope.GetOrigin() + ".container_" + types[v],
-                                tagsHash:   hashTags(tags),
-                        }
-                        mVal := c.metricPoints[key]
-                        value := envelope.GetContainerMetric().GetMemoryBytes()
+				eventType: envelope.GetEventType(),
+				name:      envelope.GetOrigin() + ".container_" + types[v],
+				tagsHash:  hashTags(tags),
+			}
+			mVal := c.metricPoints[key]
+			value := envelope.GetContainerMetric().GetMemoryBytes()
 
-                        mVal.tags = tags
-                        mVal.points = append(mVal.points, Point{
-                                Timestamp: envelope.GetTimestamp() / int64(time.Second),
-                                Value:     float64(value),
-                        })
-                        c.metricPoints[key] = mVal
+			mVal.tags = tags
+			mVal.points = append(mVal.points, Point{
+				Timestamp: envelope.GetTimestamp() / int64(time.Second),
+				Value:     float64(value),
+			})
+			c.metricPoints[key] = mVal
 		case "mem_bytes_quota":
 			key := metricKey{
-                                eventType:  envelope.GetEventType(),
-                                name:       envelope.GetOrigin() + ".container_" + types[v],
-                                tagsHash:   hashTags(tags),
-                        }
-                        mVal := c.metricPoints[key]
-                        value := envelope.GetContainerMetric().GetMemoryBytesQuota()
+				eventType: envelope.GetEventType(),
+				name:      envelope.GetOrigin() + ".container_" + types[v],
+				tagsHash:  hashTags(tags),
+			}
+			mVal := c.metricPoints[key]
+			value := envelope.GetContainerMetric().GetMemoryBytesQuota()
 
-                        mVal.tags = tags
-                        mVal.points = append(mVal.points, Point{
-                                Timestamp: envelope.GetTimestamp() / int64(time.Second),
-                                Value:     float64(value),
-                        })
-                        c.metricPoints[key] = mVal
+			mVal.tags = tags
+			mVal.points = append(mVal.points, Point{
+				Timestamp: envelope.GetTimestamp() / int64(time.Second),
+				Value:     float64(value),
+			})
+			c.metricPoints[key] = mVal
 		case "disk_bytes":
 			key := metricKey{
-                                eventType:  envelope.GetEventType(),
-                                name:       envelope.GetOrigin() + ".container_" + types[v],
-                                tagsHash:   hashTags(tags),
-                        }
-                        mVal := c.metricPoints[key]
-                        value := envelope.GetContainerMetric().GetDiskBytes()
+				eventType: envelope.GetEventType(),
+				name:      envelope.GetOrigin() + ".container_" + types[v],
+				tagsHash:  hashTags(tags),
+			}
+			mVal := c.metricPoints[key]
+			value := envelope.GetContainerMetric().GetDiskBytes()
 
-                        mVal.tags = tags
-                        mVal.points = append(mVal.points, Point{
-                                Timestamp: envelope.GetTimestamp() / int64(time.Second),
-                                Value:     float64(value),
-                        })
-                        c.metricPoints[key] = mVal
+			mVal.tags = tags
+			mVal.points = append(mVal.points, Point{
+				Timestamp: envelope.GetTimestamp() / int64(time.Second),
+				Value:     float64(value),
+			})
+			c.metricPoints[key] = mVal
 		case "disk_bytes_quota":
 			key := metricKey{
-                                eventType:  envelope.GetEventType(),
-                                name:       envelope.GetOrigin() + ".container_" + types[v],
-                                tagsHash:   hashTags(tags),
-                        }
-                        mVal := c.metricPoints[key]
-                        value := envelope.GetContainerMetric().GetDiskBytesQuota()
+				eventType: envelope.GetEventType(),
+				name:      envelope.GetOrigin() + ".container_" + types[v],
+				tagsHash:  hashTags(tags),
+			}
+			mVal := c.metricPoints[key]
+			value := envelope.GetContainerMetric().GetDiskBytesQuota()
 
-                        mVal.tags = tags
-                        mVal.points = append(mVal.points, Point{
-                                Timestamp: envelope.GetTimestamp() / int64(time.Second),
-                                Value:     float64(value),
-                        })
-                        c.metricPoints[key] = mVal			
-		}			
+			mVal.tags = tags
+			mVal.points = append(mVal.points, Point{
+				Timestamp: envelope.GetTimestamp() / int64(time.Second),
+				Value:     float64(value),
+			})
+			c.metricPoints[key] = mVal
+		}
 	}
 }
-
 
 func (c *Client) AddCounterValueMetric(envelope *events.Envelope) {
 	tags := parseTags(envelope, c)
 	key := metricKey{
-		eventType:  envelope.GetEventType(),
-		name:       getName(envelope),
-		tagsHash:   hashTags(tags),
+		eventType: envelope.GetEventType(),
+		name:      getName(envelope),
+		tagsHash:  hashTags(tags),
 	}
 
 	mVal := c.metricPoints[key]
 	value := getValue(envelope)
 
-	mVal.tags = tags 
+	mVal.tags = tags
 	mVal.points = append(mVal.points, Point{
 		Timestamp: envelope.GetTimestamp() / int64(time.Second),
 		Value:     value,
@@ -258,6 +257,7 @@ func (c *Client) PostMetrics() error {
 	c.log.Infof("Posting %d metrics", numMetrics)
 
 	seriesBytes, metricsCount := c.formatMetrics()
+	c.log.Infof("Posting data %s", seriesBytes)
 
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -297,7 +297,7 @@ func (c *Client) populateInternalMetrics() {
 
 func (c *Client) containsSlowConsumerAlert() bool {
 	key := metricKey{
-		name:       "slowConsumerAlert",
+		name:     "slowConsumerAlert",
 		tagsHash: c.tagsHash,
 	}
 	_, ok := c.metricPoints[key]
@@ -355,7 +355,7 @@ func formatTimestamp(points []Point) string {
 
 func (c *Client) addInternalMetric(name string, value uint64) {
 	key := metricKey{
-		name:       name,
+		name:     name,
 		tagsHash: c.tagsHash,
 	}
 
@@ -399,30 +399,30 @@ func getValue(envelope *events.Envelope) float64 {
 
 func parseTags(envelope *events.Envelope, c *Client) []string {
 	tags := appendTagIfNotEmpty(nil, "deployment", envelope.GetDeployment())
-	
+
 	switch envelope.GetEventType() {
 	case events.Envelope_ValueMetric:
 		tags = appendTagIfNotEmpty(tags, "job", envelope.GetJob())
-        	tags = appendTagIfNotEmpty(tags, "index", envelope.GetIndex())
-        	tags = appendTagIfNotEmpty(tags, "ip", envelope.GetIp())	
+		tags = appendTagIfNotEmpty(tags, "index", envelope.GetIndex())
+		tags = appendTagIfNotEmpty(tags, "ip", envelope.GetIp())
 	case events.Envelope_CounterEvent:
 		tags = appendTagIfNotEmpty(tags, "job", envelope.GetJob())
 		tags = appendTagIfNotEmpty(tags, "index", envelope.GetIndex())
 		tags = appendTagIfNotEmpty(tags, "ip", envelope.GetIp())
 	case events.Envelope_ContainerMetric:
 		tags = appendTagIfNotEmpty(tags, "appguid", envelope.GetContainerMetric().GetApplicationId())
-        	tags = appendTagIfNotEmpty(tags, "index", strconv.FormatInt(int64(envelope.GetContainerMetric().GetInstanceIndex()), 10))
+		tags = appendTagIfNotEmpty(tags, "index", strconv.FormatInt(int64(envelope.GetContainerMetric().GetInstanceIndex()), 10))
 		tags = appendTagIfNotEmpty(tags, "appname", c.appinfo[envelope.GetContainerMetric().GetApplicationId()].Name)
-                tags = appendTagIfNotEmpty(tags, "org", c.appinfo[envelope.GetContainerMetric().GetApplicationId()].Org)
-                tags = appendTagIfNotEmpty(tags, "space", c.appinfo[envelope.GetContainerMetric().GetApplicationId()].Space)
+		tags = appendTagIfNotEmpty(tags, "org", c.appinfo[envelope.GetContainerMetric().GetApplicationId()].Org)
+		tags = appendTagIfNotEmpty(tags, "space", c.appinfo[envelope.GetContainerMetric().GetApplicationId()].Space)
 	case events.Envelope_HttpStartStop:
-                tags = appendTagIfNotEmpty(tags, "appguid", UUIDToString(envelope.GetHttpStartStop().GetApplicationId()))
+		tags = appendTagIfNotEmpty(tags, "appguid", UUIDToString(envelope.GetHttpStartStop().GetApplicationId()))
 		//always 0
-                //tags = appendTagIfNotEmpty(tags, "index", strconv.FormatInt(int64(envelope.GetHttpStartStop().GetInstanceIndex()), 10))	
-                tags = appendTagIfNotEmpty(tags, "statuscode", strconv.FormatInt(int64(envelope.GetHttpStartStop().GetStatusCode()), 10))	
+		//tags = appendTagIfNotEmpty(tags, "index", strconv.FormatInt(int64(envelope.GetHttpStartStop().GetInstanceIndex()), 10))
+		tags = appendTagIfNotEmpty(tags, "statuscode", strconv.FormatInt(int64(envelope.GetHttpStartStop().GetStatusCode()), 10))
 		//take out anything after a whitespace
-		prettyuri := strings.Fields(envelope.GetHttpStartStop().GetUri())	
-                tags = appendTagIfNotEmpty(tags, "uri", prettyuri[0])	
+		prettyuri := strings.Fields(envelope.GetHttpStartStop().GetUri())
+		tags = appendTagIfNotEmpty(tags, "uri", prettyuri[0])
 		//always the loadbalancer in front of CF so not useful
 		//tags = appendTagIfNotEmpty(tags, "remoteaddress", envelope.GetHttpStartStop().GetRemoteAddress())
 		tags = appendTagIfNotEmpty(tags, "appname", c.appinfo[UUIDToString(envelope.GetHttpStartStop().GetApplicationId())].Name)
@@ -431,8 +431,8 @@ func parseTags(envelope *events.Envelope, c *Client) []string {
 	}
 
 	for tname, tvalue := range envelope.GetTags() {
- 		tags = appendTagIfNotEmpty(tags, tname, tvalue)
- 	}
+		tags = appendTagIfNotEmpty(tags, tname, tvalue)
+	}
 
 	return tags
 }
@@ -445,13 +445,13 @@ func appendTagIfNotEmpty(tags []string, key, value string) []string {
 }
 
 func hashTags(tags []string) string {
- 	sort.Strings(tags)
- 	hash := ""
- 	for _, tag := range tags {
- 		tagHash := sha1.Sum([]byte(tag))
- 		hash += string(tagHash[:])
- 	}
- 	return hash
+	sort.Strings(tags)
+	hash := ""
+	for _, tag := range tags {
+		tagHash := sha1.Sum([]byte(tag))
+		hash += string(tagHash[:])
+	}
+	return hash
 }
 
 func UUIDToString(uuid *events.UUID) string {
